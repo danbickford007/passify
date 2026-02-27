@@ -8,7 +8,7 @@ On first run, it guides you through creating a master password (entered twice) a
 
 - **Master password setup**: Prompted securely via `getpass`, confirmed twice.
 - **Strong encryption**: Vault contents are encrypted using a key derived from your master password with Scrypt and AES‑GCM (via the `cryptography` library).
-- **Local vault file**: The encrypted vault is stored under your home directory (e.g. `~/.passify/vault.json`).
+- **Local vault file**: The encrypted vault is stored under your home directory (e.g. `~/.passify/.vault`).
 
 ## Installation
 

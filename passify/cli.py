@@ -1,5 +1,6 @@
 import json
 import os
+import time
 from getpass import getpass
 from pathlib import Path
 from typing import Any, Dict, Tuple
@@ -9,11 +10,68 @@ from cryptography.exceptions import InvalidTag
 from .crypto import encrypt, decrypt
 
 
-def default_vault_path() -> Path:
+DEFAULT_VAULT_PATH = "~/.passify/.vault"
+DEFAULT_PASSWORD_DISPLAY_SECONDS = 15
+
+
+def config_path() -> Path:
+    home = Path(os.path.expanduser("~"))
+    return home / ".passify" / ".config.json"
+
+
+def ensure_passify_dir() -> Path:
     home = Path(os.path.expanduser("~"))
     vault_dir = home / ".passify"
     vault_dir.mkdir(parents=True, exist_ok=True)
-    return vault_dir / "vault.json"
+    return vault_dir
+
+
+def load_config() -> Dict[str, Any]:
+    path = config_path()
+    if not path.exists():
+        return {
+            "vault_location": DEFAULT_VAULT_PATH,
+            "password_display_time": DEFAULT_PASSWORD_DISPLAY_SECONDS,
+        }
+    try:
+        with path.open("r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError):
+        return {
+            "vault_location": DEFAULT_VAULT_PATH,
+            "password_display_time": DEFAULT_PASSWORD_DISPLAY_SECONDS,
+        }
+    return {
+        "vault_location": data.get("vault_location", DEFAULT_VAULT_PATH),
+        "password_display_time": data.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS),
+    }
+
+
+def save_config(config: Dict[str, Any]) -> None:
+    ensure_passify_dir()
+    path = config_path()
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(config, f, indent=2)
+        f.write("\n")
+
+
+def default_vault_path() -> Path:
+    ensure_passify_dir()
+    config = load_config()
+    raw = config.get("vault_location", DEFAULT_VAULT_PATH)
+    path = Path(os.path.expanduser(raw))
+
+    # Migrate old default location to .vault if config still points at default
+    home = Path(os.path.expanduser("~"))
+    legacy_dir = home / ".passify"
+    old_path = legacy_dir / "vault.json"
+    new_default = legacy_dir / ".vault"
+
+    if path == new_default and not path.exists() and old_path.exists():
+        new_default.write_text(old_path.read_text(encoding="utf-8"), encoding="utf-8")
+        old_path.unlink()
+
+    return path
 
 
 def prompt_new_master_password() -> str:
@@ -41,6 +99,7 @@ def prompt_new_master_password() -> str:
 
 
 def create_empty_vault(password: str, path: Path) -> Dict[str, Any]:
+    path.parent.mkdir(parents=True, exist_ok=True)
     initial_data: Dict[str, Any] = {
         "version": 1,
         "items": [],
@@ -86,6 +145,7 @@ def unlock_vault(path: Path, max_attempts: int = 3) -> Tuple[Dict[str, Any], str
 
 
 def save_vault(data: Dict[str, Any], password: str, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     plaintext = json.dumps(data, separators=(",", ":")).encode("utf-8")
     encrypted_blob = encrypt(password, plaintext)
     with path.open("w", encoding="utf-8") as f:
@@ -154,7 +214,7 @@ def cmd_remove(vault: Dict[str, Any], password: str, vault_path: Path, index: in
     print("Entry removed.")
 
 
-def cmd_show(vault: Dict[str, Any], index: int) -> None:
+def cmd_show(vault: Dict[str, Any], index: int, password_display_seconds: int) -> None:
     items = vault.get("items", [])
 
     if index < 0 or index >= len(items):
@@ -162,11 +222,69 @@ def cmd_show(vault: Dict[str, Any], index: int) -> None:
         return
 
     item = items[index]
-    print(f"Name     : {item.get('name', '')}")
-    print(f"Username : {item.get('username', '')}")
-    print(f"Password : {item.get('password', '')}")
-    if item.get("notes"):
-        print(f"Notes    : {item.get('notes')}")
+    name = item.get("name", "")
+    username = item.get("username", "")
+    pwd = item.get("password", "")
+    notes = item.get("notes", "")
+
+    print(f"Name     : {name}")
+    print(f"Username : {username}")
+    print(f"Password : {pwd}")
+    if notes:
+        print(f"Notes    : {notes}")
+
+    if password_display_seconds > 0:
+        print(f"\n(Hiding password in {password_display_seconds} seconds...)")
+        time.sleep(password_display_seconds)
+        print(f"Name     : {name}")
+        print(f"Username : {username}")
+        print("Password : (hidden)")
+        if notes:
+            print(f"Notes    : {notes}")
+
+
+def config_menu() -> None:
+    while True:
+        config = load_config()
+        vault_loc = config.get("vault_location", DEFAULT_VAULT_PATH)
+        display_time = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
+
+        print("\nConfiguration")
+        print(f"  Vault location      : {vault_loc}")
+        print(f"  Password display    : {display_time} seconds")
+        print("1) Set vault location")
+        print("2) Set password display time (seconds)")
+        print("3) Back to main menu")
+
+        choice = input("Select an option [1-3]: ").strip()
+
+        if choice == "1":
+            new_loc = input(f"Vault path [{vault_loc}]: ").strip()
+            if new_loc:
+                config["vault_location"] = new_loc
+                save_config(config)
+                print("Vault location updated.")
+            else:
+                print("No change.")
+        elif choice == "2":
+            raw = input(f"Password display time in seconds [{display_time}]: ").strip()
+            if raw:
+                try:
+                    secs = int(raw)
+                    if secs < 0:
+                        print("Enter 0 or a positive number.")
+                    else:
+                        config["password_display_time"] = secs
+                        save_config(config)
+                        print("Password display time updated.")
+                except ValueError:
+                    print("Please enter a number.")
+            else:
+                print("No change.")
+        elif choice == "3":
+            break
+        else:
+            print("Invalid choice, please select 1-3.")
 
 
 def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> None:
@@ -176,9 +294,10 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
         print("2) Add a password entry")
         print("3) Show a password entry (including secret)")
         print("4) Remove a password entry")
-        print("5) Quit")
+        print("5) Configuration")
+        print("6) Quit")
 
-        choice = input("Select an option [1-5]: ").strip()
+        choice = input("Select an option [1-6]: ").strip()
 
         if choice == "1":
             cmd_list(vault)
@@ -189,7 +308,9 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
             if not index_str.isdigit():
                 print("Please enter a numeric index.")
                 continue
-            cmd_show(vault, int(index_str))
+            config = load_config()
+            display_secs = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
+            cmd_show(vault, int(index_str), display_secs)
         elif choice == "4":
             index_str = input("Entry index to remove: ").strip()
             if not index_str.isdigit():
@@ -197,10 +318,12 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
                 continue
             cmd_remove(vault, password, vault_path, int(index_str))
         elif choice == "5":
+            config_menu()
+        elif choice == "6":
             print("Goodbye.")
             break
         else:
-            print("Invalid choice, please select 1-5.")
+            print("Invalid choice, please select 1-6.")
 
 
 def main(argv=None) -> None:
