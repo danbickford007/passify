@@ -236,11 +236,8 @@ def cmd_show(vault: Dict[str, Any], index: int, password_display_seconds: int) -
     if password_display_seconds > 0:
         print(f"\n(Hiding password in {password_display_seconds} seconds...)")
         time.sleep(password_display_seconds)
-        print(f"Name     : {name}")
-        print(f"Username : {username}")
-        print("Password : (hidden)")
-        if notes:
-            print(f"Notes    : {notes}")
+        # Clear screen and move cursor to top (works on Unix and most Windows terminals)
+        print("\033[2J\033[H", end="")
 
 
 def config_menu() -> None:
