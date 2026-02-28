@@ -141,7 +141,7 @@ MAIN MENU
   Add a password entry    Save a new login (name, username, password, notes).
   Show a password entry   List all entries; pick one to view. Password is shown
                           for a few seconds, then the screen clears.
-  Remove a password entry Delete an entry by index (from the list).
+  Remove a password entry Browse entries with Up/Down; select one and type 'yes' to remove.
   Configuration          Vault path, password display time, change master password.
   Help                   Show this help.
   Quit                   Exit Passify.
@@ -351,8 +351,8 @@ def cmd_remove(vault: Dict[str, Any], password: str, vault_path: Path, index: in
 
     item = items[index]
     name = item.get("name", f"entry-{index}")
-    confirm = input(f"Remove entry '{name}' at index {index}? [y/N]: ").strip().lower()
-    if confirm != "y":
+    confirm = input(f"Type 'yes' to remove entry '{name}': ").strip()
+    if confirm != "yes":
         print("Aborted.")
         return
 
@@ -439,6 +439,45 @@ def show_entries_menu(vault: Dict[str, Any], password_display_seconds: int) -> N
 
         cmd_show(vault, selected, password_display_seconds)
         return
+
+
+def remove_entries_menu(vault: Dict[str, Any], vault_path: Path, password: str) -> None:
+    """Show a navigable list of entries; Enter on an entry prompts for 'yes' to remove; Back returns to main menu."""
+    back_label = "← Back to main menu"
+
+    while True:
+        items = vault.get("items", [])
+        if not items:
+            print("\033[3J\033[2J\033[H", end="")
+            print("\nRemove a password entry")
+            print("\nNo password entries stored yet.")
+            return
+
+        options = [_entry_option_label(item, i) for i, item in enumerate(items)] + [back_label]
+        selected = 0
+
+        while True:
+            print("\033[3J\033[2J\033[H", end="")
+            draw_menu("Remove a password entry", options, selected, "Use Up/Down or k/j to move, Enter to remove (confirm with 'yes').")
+
+            key = get_key()
+            if key in ("up", "k"):
+                selected = (selected - 1) % len(options)
+                continue
+            if key in ("down", "j"):
+                selected = (selected + 1) % len(options)
+                continue
+            if key == "enter":
+                break
+            if key and key.isdigit() and 0 <= int(key) < len(options):
+                selected = int(key)
+                break
+
+        if selected == len(options) - 1:
+            return
+
+        cmd_remove(vault, password, vault_path, selected)
+        input("\nPress Enter to return to list...")
 
 
 def config_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> Optional[str]:
@@ -572,11 +611,7 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
             display_secs = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
             show_entries_menu(vault, display_secs)
         elif selected == 2:
-            index_str = input("\nEntry index to remove: ").strip()
-            if not index_str.isdigit():
-                print("Please enter a numeric index.")
-            else:
-                cmd_remove(vault, password, vault_path, int(index_str))
+            remove_entries_menu(vault, vault_path, password)
         elif selected == 3:
             new_password = config_menu(vault_path, vault, password)
             if new_password is not None:
@@ -588,7 +623,7 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
             print("Goodbye.")
             break
 
-        if selected != 5 and selected != 1 and selected != 4:
+        if selected != 5 and selected != 1 and selected != 4 and selected != 2:
             input("\nPress Enter to return to menu...")
 
 
