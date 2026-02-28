@@ -358,7 +358,8 @@ def show_entries_menu(vault: Dict[str, Any], password_display_seconds: int) -> N
         return
 
 
-def config_menu() -> None:
+def config_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> Optional[str]:
+    """Returns new master password if changed, else None."""
     while True:
         config = load_config()
         vault_loc = config.get("vault_location", DEFAULT_VAULT_PATH)
@@ -369,9 +370,10 @@ def config_menu() -> None:
         print(f"  Password display    : {display_time} seconds")
         print("1) Set vault location")
         print("2) Set password display time (seconds)")
-        print("3) Back to main menu")
+        print("3) Change master password")
+        print("4) Back to main menu")
 
-        choice = input("Select an option [1-3]: ").strip()
+        choice = input("Select an option [1-4]: ").strip()
 
         if choice == "1":
             new_loc = input(f"Vault path [{vault_loc}]: ").strip()
@@ -397,9 +399,19 @@ def config_menu() -> None:
             else:
                 print("No change.")
         elif choice == "3":
+            current = getpass("Current master password: ")
+            if current != password:
+                print("Incorrect master password.")
+                continue
+            new_password = prompt_new_master_password()
+            save_vault(vault, new_password, vault_path)
+            print("Master password changed. Use the new password next time you open the vault.")
+            return new_password
+        elif choice == "4":
             break
         else:
-            print("Invalid choice, please select 1-3.")
+            print("Invalid choice, please select 1-4.")
+    return None
 
 
 def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> None:
@@ -451,7 +463,9 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
             else:
                 cmd_remove(vault, password, vault_path, int(index_str))
         elif selected == 3:
-            config_menu()
+            new_password = config_menu(vault_path, vault, password)
+            if new_password is not None:
+                password = new_password
         elif selected == 4:
             print("Goodbye.")
             break
