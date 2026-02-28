@@ -73,19 +73,50 @@ def get_key() -> Optional[str]:
     return _get_key_unix()
 
 
-PASSIFY_HEADER = r"""
-  ____      _      ____   ____   ___   _____    _   _
- |  _ \    / \   / ___| / ___|   | |   |       \ \ / /
- | |_) |  / _ \  \___ \ \___ \   | |   |___     \   /
- |  __/  | | | | ___) | ___) |   | |   |         | |
- |_|     |_| |_| |____/ |____/   |_|   |         |_|
-        ~ keep your secrets safe ~
-"""
+# ANSI color codes for PASSIFY header (one per letter)
+ANSI_RESET = "\033[0m"
+ANSI_BRIGHT_RED = "\033[91m"
+ANSI_BRIGHT_GREEN = "\033[92m"
+ANSI_BRIGHT_YELLOW = "\033[93m"
+ANSI_BRIGHT_BLUE = "\033[94m"
+ANSI_BRIGHT_MAGENTA = "\033[95m"
+ANSI_BRIGHT_CYAN = "\033[96m"
+ANSI_BRIGHT_WHITE = "\033[97m"
+
+# Each letter is 5 lines; same width per line for alignment (10 chars)
+PASSIFY_LETTERS = [
+    ["  ____    ", " |  _ \\   ", " | |_) |  ", " |  __/   ", " |_|      "],  # P
+    ["   _      ", "  / \\     ", " / _ \\    ", "| | | |   ", "|_| |_|   "],  # A
+    ["  ____    ", " / ___|   ", " \\___ \\   ", "  ___) |  ", " |____/   "],  # S
+    ["  ____    ", " / ___|   ", " \\___ \\   ", "  ___) |  ", " |____/   "],  # S
+    ["  ___     ", "  | |     ", "  | |     ", "  | |     ", "  |_|     "],  # I
+    [" _____    ", " |        ", " |___      ", " |        ", " |        "],  # F
+    [" _     _    ", " \\ \\ / /  ", " \\   /   ", "   | |    ", "   |_|    "],  # Y
+]
+PASSIFY_COLORS = [
+    ANSI_BRIGHT_RED,
+    ANSI_BRIGHT_GREEN,
+    ANSI_BRIGHT_YELLOW,
+    ANSI_BRIGHT_BLUE,
+    ANSI_BRIGHT_MAGENTA,
+    ANSI_BRIGHT_CYAN,
+    ANSI_BRIGHT_WHITE,
+]
+
+
+def print_passify_header() -> None:
+    """Print the PASSIFY ASCII art with a different color per letter."""
+    for line_idx in range(5):
+        for letter_idx in range(7):
+            print(PASSIFY_COLORS[letter_idx] + PASSIFY_LETTERS[letter_idx][line_idx], end="")
+        print(ANSI_RESET)
+    print("        " + ANSI_BRIGHT_WHITE + "~ keep your secrets safe ~" + ANSI_RESET)
+    print()
 
 
 def draw_main_menu(selected: int, options: List[str]) -> None:
     """Print the main menu with the given option selected (0-based index)."""
-    print(PASSIFY_HEADER)
+    print_passify_header()
     print("Passify menu")
     for i, label in enumerate(options):
         prefix = "> " if i == selected else "  "
