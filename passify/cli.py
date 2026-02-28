@@ -133,6 +133,44 @@ def draw_menu(title: str, options: List[str], selected: int, hint: str = "Use Up
     print(f"\n{hint}")
 
 
+HELP_TEXT = """
+PASSIFY — Encrypted CLI Password Manager
+========================================
+
+MAIN MENU
+  Add a password entry    Save a new login (name, username, password, notes).
+  Show a password entry   List all entries; pick one to view. Password is shown
+                          for a few seconds, then the screen clears.
+  Remove a password entry Delete an entry by index (from the list).
+  Configuration          Vault path, password display time, change master password.
+  Help                   Show this help.
+  Quit                   Exit Passify.
+
+NAVIGATION
+  Up / Down  or  k / j    Move selection.
+  Enter                  Confirm.
+  1–6                    Jump to that menu option.
+
+CONFIGURATION
+  Vault location         Where the encrypted vault file is stored (default: ~/.passify/.vault).
+  Password display time  Seconds the password stays visible when viewing (default: 15).
+  Change master password Re-encrypt the vault with a new password (current required).
+
+FILES
+  ~/.passify/.vault       Encrypted vault (default).
+  ~/.passify/.config.json Settings.
+
+SECURITY
+  Your master password is never stored; it only derives the key. If you forget it,
+  the vault cannot be recovered. The vault uses Scrypt + AES-256-GCM.
+"""
+
+
+def print_help() -> None:
+    """Print the in-app help menu."""
+    print(HELP_TEXT)
+
+
 def config_path() -> Path:
     home = Path(os.path.expanduser("~"))
     return home / ".passify" / ".config.json"
@@ -493,7 +531,8 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
         "2) Show a password entry",
         "3) Remove a password entry",
         "4) Configuration",
-        "5) Quit",
+        "5) Help",
+        "6) Quit",
     ]
     selected = 0
 
@@ -517,7 +556,7 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
                 continue
             if key == "enter":
                 break
-            # Number shortcut 1-5
+            # Number shortcut 1-6
             if key and key.isdigit() and 1 <= int(key) <= len(options):
                 selected = int(key) - 1
                 break
@@ -540,14 +579,28 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
             if new_password is not None:
                 password = new_password
         elif selected == 4:
+            print(HELP_TEXT)
+            input("\nPress Enter to return to menu...")
+        elif selected == 5:
             print("Goodbye.")
             break
 
-        if selected != 4 and selected != 1:
+        if selected != 5 and selected != 1 and selected != 4:
             input("\nPress Enter to return to menu...")
 
 
 def main(argv=None) -> None:
+    if argv is None:
+        argv = sys.argv
+    if "--help" in argv or "-h" in argv:
+        print(
+            "Passify — encrypted CLI password manager\n"
+            "Usage: python -m passify  [--help]\n"
+            "  --help, -h   Show this message and exit.\n"
+            "Run without options to open the vault and main menu."
+        )
+        return
+
     vault_path = default_vault_path()
 
     if not vault_path.exists():
