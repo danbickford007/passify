@@ -1,9 +1,10 @@
 import json
 import os
+import sys
 import time
 from getpass import getpass
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from cryptography.exceptions import InvalidTag
 
@@ -12,6 +13,73 @@ from .crypto import encrypt, decrypt
 
 DEFAULT_VAULT_PATH = "~/.passify/.vault"
 DEFAULT_PASSWORD_DISPLAY_SECONDS = 15
+
+
+def _get_key_unix() -> Optional[str]:
+    """Read a single key on Unix; returns 'up', 'down', 'enter', or the character."""
+    import termios
+    import tty
+    fd = sys.stdin.fileno()
+    try:
+        old = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+            if ch == "\x1b":
+                sys.stdin.read(1)  # [
+                c = sys.stdin.read(1)
+                if c == "A":
+                    return "up"
+                if c == "B":
+                    return "down"
+            if ch in ("\r", "\n"):
+                return "enter"
+            return ch
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    except (termios.error, OSError):
+        return None
+
+
+def _get_key_win() -> Optional[str]:
+    """Read a single key on Windows; returns 'up', 'down', 'enter', or the character."""
+    try:
+        import msvcrt
+    except ImportError:
+        return None
+    while True:
+        if msvcrt.kbhit():
+            break
+        time.sleep(0.02)
+    ch = msvcrt.getch()
+    if ch in (b"\r", b"\n"):
+        return "enter"
+    if ch == b"\xe0" or ch == b"\x00":
+        ext = msvcrt.getch()
+        if ext == b"H":
+            return "up"
+        if ext == b"P":
+            return "down"
+    try:
+        return ch.decode(sys.stdin.encoding or "utf-8", errors="replace")
+    except Exception:
+        return None
+
+
+def get_key() -> Optional[str]:
+    """Read one keypress; returns 'up', 'down', 'enter', or the key character."""
+    if os.name == "nt":
+        return _get_key_win()
+    return _get_key_unix()
+
+
+def draw_main_menu(selected: int, options: List[str]) -> None:
+    """Print the main menu with the given option selected (0-based index)."""
+    print("\nPassify menu")
+    for i, label in enumerate(options):
+        prefix = "> " if i == selected else "  "
+        print(f"{prefix}{label}")
+    print("\nUse Up/Down or k/j to move, Enter to select.")
 
 
 def config_path() -> Path:
@@ -285,42 +353,68 @@ def config_menu() -> None:
 
 
 def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> None:
+    options = [
+        "1) List password entries",
+        "2) Add a password entry",
+        "3) Show a password entry (including secret)",
+        "4) Remove a password entry",
+        "5) Configuration",
+        "6) Quit",
+    ]
+    selected = 0
+
     while True:
-        print("\nPassify menu")
-        print("1) List password entries")
-        print("2) Add a password entry")
-        print("3) Show a password entry (including secret)")
-        print("4) Remove a password entry")
-        print("5) Configuration")
-        print("6) Quit")
+        # Clear and draw menu
+        print("\033[2J\033[H", end="")
+        draw_main_menu(selected, options)
 
-        choice = input("Select an option [1-6]: ").strip()
+        # Wait for selection
+        while True:
+            key = get_key()
+            if key in ("up", "k"):
+                selected = (selected - 1) % len(options)
+                print("\033[2J\033[H", end="")
+                draw_main_menu(selected, options)
+                continue
+            if key in ("down", "j"):
+                selected = (selected + 1) % len(options)
+                print("\033[2J\033[H", end="")
+                draw_main_menu(selected, options)
+                continue
+            if key == "enter":
+                break
+            # Number shortcut 1-6
+            if key and key.isdigit() and 1 <= int(key) <= len(options):
+                selected = int(key) - 1
+                break
 
-        if choice == "1":
+        # Run selected action
+        if selected == 0:
             cmd_list(vault)
-        elif choice == "2":
+        elif selected == 1:
             cmd_add(vault, password, vault_path)
-        elif choice == "3":
-            index_str = input("Entry index to show: ").strip()
+        elif selected == 2:
+            index_str = input("\nEntry index to show: ").strip()
             if not index_str.isdigit():
                 print("Please enter a numeric index.")
-                continue
-            config = load_config()
-            display_secs = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
-            cmd_show(vault, int(index_str), display_secs)
-        elif choice == "4":
-            index_str = input("Entry index to remove: ").strip()
+            else:
+                config = load_config()
+                display_secs = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
+                cmd_show(vault, int(index_str), display_secs)
+        elif selected == 3:
+            index_str = input("\nEntry index to remove: ").strip()
             if not index_str.isdigit():
                 print("Please enter a numeric index.")
-                continue
-            cmd_remove(vault, password, vault_path, int(index_str))
-        elif choice == "5":
+            else:
+                cmd_remove(vault, password, vault_path, int(index_str))
+        elif selected == 4:
             config_menu()
-        elif choice == "6":
+        elif selected == 5:
             print("Goodbye.")
             break
-        else:
-            print("Invalid choice, please select 1-6.")
+
+        if selected != 5:
+            input("\nPress Enter to return to menu...")
 
 
 def main(argv=None) -> None:
