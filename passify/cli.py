@@ -73,9 +73,20 @@ def get_key() -> Optional[str]:
     return _get_key_unix()
 
 
+PASSIFY_HEADER = r"""
+  ____     _      ____    ____     ___    _____    _   _
+ |  _ \   / \   / ___|  / ___|   | |   |       \ \ / /
+ | |_) | / _ \  \___ \  \___ \   | |   |___     \   /
+ |  __/  | | | | ___) | ___) |   | |   |         | |
+ |_|     |_| |_| |____/ |____/   |_|   |         |_|
+        ~ keep your secrets safe ~
+"""
+
+
 def draw_main_menu(selected: int, options: List[str]) -> None:
     """Print the main menu with the given option selected (0-based index)."""
-    print("\nPassify menu")
+    print(PASSIFY_HEADER)
+    print("Passify menu")
     for i, label in enumerate(options):
         prefix = "> " if i == selected else "  "
         print(f"{prefix}{label}")
