@@ -360,37 +360,67 @@ def show_entries_menu(vault: Dict[str, Any], password_display_seconds: int) -> N
 
 def config_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> Optional[str]:
     """Returns new master password if changed, else None."""
+    options = [
+        "Set vault location",
+        "Set password display time (seconds)",
+        "Change master password",
+        "← Back to main menu",
+    ]
+    selected = 0
+
     while True:
         config = load_config()
         vault_loc = config.get("vault_location", DEFAULT_VAULT_PATH)
         display_time = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
+        title = f"Configuration\n  Vault location   : {vault_loc}\n  Password display : {display_time} seconds"
 
-        print("\nConfiguration")
-        print(f"  Vault location      : {vault_loc}")
-        print(f"  Password display    : {display_time} seconds")
-        print("1) Set vault location")
-        print("2) Set password display time (seconds)")
-        print("3) Change master password")
-        print("4) Back to main menu")
+        print("\033[2J\033[H", end="")
+        draw_menu(title, options, selected)
 
-        choice = input("Select an option [1-4]: ").strip()
+        while True:
+            key = get_key()
+            if key in ("up", "k"):
+                selected = (selected - 1) % len(options)
+                config = load_config()
+                vault_loc = config.get("vault_location", DEFAULT_VAULT_PATH)
+                display_time = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
+                title = f"Configuration\n  Vault location   : {vault_loc}\n  Password display : {display_time} seconds"
+                print("\033[2J\033[H", end="")
+                draw_menu(title, options, selected)
+                continue
+            if key in ("down", "j"):
+                selected = (selected + 1) % len(options)
+                config = load_config()
+                vault_loc = config.get("vault_location", DEFAULT_VAULT_PATH)
+                display_time = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
+                title = f"Configuration\n  Vault location   : {vault_loc}\n  Password display : {display_time} seconds"
+                print("\033[2J\033[H", end="")
+                draw_menu(title, options, selected)
+                continue
+            if key == "enter":
+                break
+            if key and key.isdigit() and 1 <= int(key) <= len(options):
+                selected = int(key) - 1
+                break
 
-        if choice == "1":
-            new_loc = input(f"Vault path [{vault_loc}]: ").strip()
+        if selected == 0:
+            new_loc = input(f"\nVault path [{vault_loc}]: ").strip()
             if new_loc:
+                config = load_config()
                 config["vault_location"] = new_loc
                 save_config(config)
                 print("Vault location updated.")
             else:
                 print("No change.")
-        elif choice == "2":
-            raw = input(f"Password display time in seconds [{display_time}]: ").strip()
+        elif selected == 1:
+            raw = input(f"\nPassword display time in seconds [{display_time}]: ").strip()
             if raw:
                 try:
                     secs = int(raw)
                     if secs < 0:
                         print("Enter 0 or a positive number.")
                     else:
+                        config = load_config()
                         config["password_display_time"] = secs
                         save_config(config)
                         print("Password display time updated.")
@@ -398,19 +428,20 @@ def config_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> Optio
                     print("Please enter a number.")
             else:
                 print("No change.")
-        elif choice == "3":
-            current = getpass("Current master password: ")
+        elif selected == 2:
+            current = getpass("\nCurrent master password: ")
             if current != password:
                 print("Incorrect master password.")
-                continue
-            new_password = prompt_new_master_password()
-            save_vault(vault, new_password, vault_path)
-            print("Master password changed. Use the new password next time you open the vault.")
-            return new_password
-        elif choice == "4":
+            else:
+                new_password = prompt_new_master_password()
+                save_vault(vault, new_password, vault_path)
+                print("Master password changed. Use the new password next time you open the vault.")
+                return new_password
+        elif selected == 3:
             break
-        else:
-            print("Invalid choice, please select 1-4.")
+
+        if selected != 3:
+            input("\nPress Enter to return to configuration...")
     return None
 
 
