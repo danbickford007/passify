@@ -298,8 +298,13 @@ def cmd_show(vault: Dict[str, Any], index: int, password_display_seconds: int) -
         print(f"Notes    : {notes}")
 
     if password_display_seconds > 0:
-        print(f"\n(Hiding password in {password_display_seconds} seconds...)")
-        time.sleep(password_display_seconds)
+        remaining = password_display_seconds
+        while remaining > 0:
+            s = "second" if remaining == 1 else "seconds"
+            print(f"\r(Hiding password in {remaining} {s}...)", end="", flush=True)
+            time.sleep(1)
+            remaining -= 1
+        print("\r" + " " * 50, end="", flush=True)
         # Clear screen and move cursor to top (works on Unix and most Windows terminals)
         print("\033[2J\033[H", end="")
 
