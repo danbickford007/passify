@@ -16,7 +16,7 @@ AES_NONCE_LENGTH = 12
 @dataclass
 class KdfParams:
     salt: bytes
-    n: int = 2**14
+    n: int = 2**17
     r: int = 8
     p: int = 1
 
