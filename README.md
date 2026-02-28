@@ -2,6 +2,26 @@
 
 **Passify** is a 1Password-style password manager for the terminal. Store passwords and notes in a single encrypted vault, unlock with one master password, and manage everything through a keyboard-driven menu.
 
+```
+  ____       _        ____      ____      ___      _____     _     _
+ |  _ \     / \      / ___|    / ___|     | |      |         \ \ / /
+ | |_) |   / _ \     \___ \    \___ \     | |      |___       \   /
+ |  __/   | | | |     ___) |    ___) |    | |      |           | |
+ |_|      |_| |_|    |____/    |____/     |_|      |           |_|
+        ~ keep your secrets safe ~
+
+Passify menu
+> 1) Add a password entry
+  2) Show a password entry
+  3) Remove a password entry
+  4) Configuration
+  5) Help
+  6) Quit
+
+Use Up/Down or k/j to move, Enter to select.
+
+```
+
 ---
 
 ## Features
