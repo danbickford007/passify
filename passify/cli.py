@@ -210,6 +210,7 @@ def save_config(config: Dict[str, Any]) -> None:
     with path.open("w", encoding="utf-8") as f:
         json.dump(config, f, indent=2)
         f.write("\n")
+    path.chmod(0o600)
 
 
 def default_vault_path() -> Path:
@@ -268,6 +269,7 @@ def create_empty_vault(password: str, path: Path) -> Dict[str, Any]:
     with path.open("w", encoding="utf-8") as f:
         json.dump(encrypted_blob, f, separators=(",", ":"))
         f.write("\n")
+    path.chmod(0o600)
 
     return initial_data
 
@@ -308,6 +310,7 @@ def save_vault(data: Dict[str, Any], password: str, path: Path) -> None:
     with path.open("w", encoding="utf-8") as f:
         json.dump(encrypted_blob, f, separators=(",", ":"))
         f.write("\n")
+    path.chmod(0o600)
 
 
 def cmd_add(vault: Dict[str, Any], password: str, vault_path: Path) -> None:
@@ -386,7 +389,7 @@ def cmd_show(vault: Dict[str, Any], index: int, password_display_seconds: int) -
             remaining -= 1
         print("\r" + " " * 50, end="", flush=True)
         # Clear screen and move cursor to top (works on Unix and most Windows terminals)
-        print("\033[2J\033[H", end="")
+        print("\033[3J\033[2J\033[H", end="")
 
 
 def _entry_option_label(item: Dict[str, Any], index: int) -> str:
@@ -401,7 +404,7 @@ def show_entries_menu(vault: Dict[str, Any], password_display_seconds: int) -> N
     back_label = "← Back to main menu"
 
     if not items:
-        print("\033[2J\033[H", end="")
+        print("\033[3J\033[2J\033[H", end="")
         print("\nShow a password entry")
         print("\nNo password entries stored yet.")
         return
@@ -410,19 +413,19 @@ def show_entries_menu(vault: Dict[str, Any], password_display_seconds: int) -> N
     selected = 0
 
     while True:
-        print("\033[2J\033[H", end="")
+        print("\033[3J\033[2J\033[H", end="")
         draw_menu("Show a password entry", options, selected)
 
         while True:
             key = get_key()
             if key in ("up", "k"):
                 selected = (selected - 1) % len(options)
-                print("\033[2J\033[H", end="")
+                print("\033[3J\033[2J\033[H", end="")
                 draw_menu("Show a password entry", options, selected)
                 continue
             if key in ("down", "j"):
                 selected = (selected + 1) % len(options)
-                print("\033[2J\033[H", end="")
+                print("\033[3J\033[2J\033[H", end="")
                 draw_menu("Show a password entry", options, selected)
                 continue
             if key == "enter":
@@ -454,7 +457,7 @@ def config_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> Optio
         display_time = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
         title = f"Configuration\n  Vault location   : {vault_loc}\n  Password display : {display_time} seconds"
 
-        print("\033[2J\033[H", end="")
+        print("\033[3J\033[2J\033[H", end="")
         draw_menu(title, options, selected)
 
         while True:
@@ -465,7 +468,7 @@ def config_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> Optio
                 vault_loc = config.get("vault_location", DEFAULT_VAULT_PATH)
                 display_time = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
                 title = f"Configuration\n  Vault location   : {vault_loc}\n  Password display : {display_time} seconds"
-                print("\033[2J\033[H", end="")
+                print("\033[3J\033[2J\033[H", end="")
                 draw_menu(title, options, selected)
                 continue
             if key in ("down", "j"):
@@ -474,7 +477,7 @@ def config_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> Optio
                 vault_loc = config.get("vault_location", DEFAULT_VAULT_PATH)
                 display_time = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
                 title = f"Configuration\n  Vault location   : {vault_loc}\n  Password display : {display_time} seconds"
-                print("\033[2J\033[H", end="")
+                print("\033[3J\033[2J\033[H", end="")
                 draw_menu(title, options, selected)
                 continue
             if key == "enter":
@@ -538,7 +541,7 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
 
     while True:
         # Clear and draw menu
-        print("\033[2J\033[H", end="")
+        print("\033[3J\033[2J\033[H", end="")
         draw_main_menu(selected, options)
 
         # Wait for selection
@@ -546,12 +549,12 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
             key = get_key()
             if key in ("up", "k"):
                 selected = (selected - 1) % len(options)
-                print("\033[2J\033[H", end="")
+                print("\033[3J\033[2J\033[H", end="")
                 draw_main_menu(selected, options)
                 continue
             if key in ("down", "j"):
                 selected = (selected + 1) % len(options)
-                print("\033[2J\033[H", end="")
+                print("\033[3J\033[2J\033[H", end="")
                 draw_main_menu(selected, options)
                 continue
             if key == "enter":
