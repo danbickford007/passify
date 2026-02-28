@@ -82,6 +82,15 @@ def draw_main_menu(selected: int, options: List[str]) -> None:
     print("\nUse Up/Down or k/j to move, Enter to select.")
 
 
+def draw_menu(title: str, options: List[str], selected: int, hint: str = "Use Up/Down or k/j to move, Enter to select.") -> None:
+    """Print a menu with title and options; selected is 0-based index."""
+    print(f"\n{title}")
+    for i, label in enumerate(options):
+        prefix = "> " if i == selected else "  "
+        print(f"{prefix}{label}")
+    print(f"\n{hint}")
+
+
 def config_path() -> Path:
     home = Path(os.path.expanduser("~"))
     return home / ".passify" / ".config.json"
@@ -221,19 +230,6 @@ def save_vault(data: Dict[str, Any], password: str, path: Path) -> None:
         f.write("\n")
 
 
-def cmd_list(vault: Dict[str, Any]) -> None:
-    items = vault.get("items", [])
-
-    if not items:
-        print("No password entries stored yet.")
-        return
-
-    for idx, item in enumerate(items):
-        name = item.get("name", f"entry-{idx}")
-        username = item.get("username", "")
-        print(f"[{idx}] {name}" + (f" (user: {username})" if username else ""))
-
-
 def cmd_add(vault: Dict[str, Any], password: str, vault_path: Path) -> None:
     print("Adding a new password entry.")
     name = input("Name (e.g. site/app): ").strip()
@@ -308,6 +304,55 @@ def cmd_show(vault: Dict[str, Any], index: int, password_display_seconds: int) -
         print("\033[2J\033[H", end="")
 
 
+def _entry_option_label(item: Dict[str, Any], index: int) -> str:
+    name = item.get("name", f"entry-{index}")
+    username = item.get("username", "")
+    return f"[{index}] {name}" + (f" (user: {username})" if username else "")
+
+
+def show_entries_menu(vault: Dict[str, Any], password_display_seconds: int) -> None:
+    """Show a navigable list of password entries; Enter shows details, Back returns to main menu."""
+    items = vault.get("items", [])
+    back_label = "← Back to main menu"
+
+    if not items:
+        print("\033[2J\033[H", end="")
+        print("\nShow a password entry")
+        print("\nNo password entries stored yet.")
+        return
+
+    options = [_entry_option_label(item, i) for i, item in enumerate(items)] + [back_label]
+    selected = 0
+
+    while True:
+        print("\033[2J\033[H", end="")
+        draw_menu("Show a password entry", options, selected)
+
+        while True:
+            key = get_key()
+            if key in ("up", "k"):
+                selected = (selected - 1) % len(options)
+                print("\033[2J\033[H", end="")
+                draw_menu("Show a password entry", options, selected)
+                continue
+            if key in ("down", "j"):
+                selected = (selected + 1) % len(options)
+                print("\033[2J\033[H", end="")
+                draw_menu("Show a password entry", options, selected)
+                continue
+            if key == "enter":
+                break
+            if key and key.isdigit() and 0 <= int(key) < len(options):
+                selected = int(key)
+                break
+
+        if selected == len(options) - 1:
+            return
+
+        cmd_show(vault, selected, password_display_seconds)
+        return
+
+
 def config_menu() -> None:
     while True:
         config = load_config()
@@ -354,12 +399,11 @@ def config_menu() -> None:
 
 def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> None:
     options = [
-        "1) List password entries",
-        "2) Add a password entry",
-        "3) Show a password entry (including secret)",
-        "4) Remove a password entry",
-        "5) Configuration",
-        "6) Quit",
+        "1) Add a password entry",
+        "2) Show a password entry",
+        "3) Remove a password entry",
+        "4) Configuration",
+        "5) Quit",
     ]
     selected = 0
 
@@ -383,37 +427,31 @@ def interactive_menu(vault_path: Path, vault: Dict[str, Any], password: str) -> 
                 continue
             if key == "enter":
                 break
-            # Number shortcut 1-6
+            # Number shortcut 1-5
             if key and key.isdigit() and 1 <= int(key) <= len(options):
                 selected = int(key) - 1
                 break
 
         # Run selected action
         if selected == 0:
-            cmd_list(vault)
-        elif selected == 1:
             cmd_add(vault, password, vault_path)
+        elif selected == 1:
+            config = load_config()
+            display_secs = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
+            show_entries_menu(vault, display_secs)
         elif selected == 2:
-            index_str = input("\nEntry index to show: ").strip()
-            if not index_str.isdigit():
-                print("Please enter a numeric index.")
-            else:
-                config = load_config()
-                display_secs = config.get("password_display_time", DEFAULT_PASSWORD_DISPLAY_SECONDS)
-                cmd_show(vault, int(index_str), display_secs)
-        elif selected == 3:
             index_str = input("\nEntry index to remove: ").strip()
             if not index_str.isdigit():
                 print("Please enter a numeric index.")
             else:
                 cmd_remove(vault, password, vault_path, int(index_str))
-        elif selected == 4:
+        elif selected == 3:
             config_menu()
-        elif selected == 5:
+        elif selected == 4:
             print("Goodbye.")
             break
 
-        if selected != 5:
+        if selected != 4 and selected != 1:
             input("\nPress Enter to return to menu...")
 
 
